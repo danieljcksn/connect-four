@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	pb "github.com/danieljcksn/connect-four/game"
+	pb "github.com/danieljcksn/connect-four/game/proto"
 
 	"google.golang.org/grpc"
 )
