@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+option go_package = "https://github.com/danieljcksn/connect-four/game/proto";
+
+package game.proto;
+
+service GameService{
+    rpc CreateGame(CreateGameRequest) returns (CreateGameResponse);
+    rpc GetGame(GetGameRequest) returns (GetGameResponse);
+    rpc MakeMove(MakeMoveRequest) returns (MakeMoveResponse);
+}
+
+message CreateGameRequest{}
+message CreateGameResponse{
+    string game_id = 1;
+}
+
+message GetGameRequest{
+    string game_id = 1;
+}
+
+message GetGameResponse {
+    repeated int32 board = 1;
+
+    int32 rows = 2;
+    int32 cols = 3;
+
+    string current_player = 4;
+    bool is_game_over = 5;
+}
+
+message MakeMoveRequest{
+    string game_id = 1;
+    int32 column = 2;
+}
+
+message MakeMoveResponse{
+    string game_id = 1;
+    string current_player = 2;
+    bool is_game_over = 3;
+}
+
