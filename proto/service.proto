@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+option go_package = "https://github.com/danieljcksn/connect-four/game/proto";
+
+option java_multiple_files = true;
+option java_package = "game";
+option java_outer_classname = "GameProto";
+
+package game;
+
+// Interface exported by the server.
+service GameService{
+    // A client-to-server streaming RPC. 
+    //
+    // Once the server has started the stream, the client can 
+    // send the first message in order to connect and start the game.
+    rpc Connect(ConnectRequest) returns (ConnectResponse) {};
+
+
+    // A serve-to-client streaming RPC.
+    //
+    // The game will alternate between the local player (located in the server) 
+    // and the remote player (located in the client). 
+    // So the server needs to warn the client when it's their turn to play.
+    rpc NotifyPlayerTurn(NotifyPlayerTurnRequest) returns (NotifyPlayerTurnResponse) {};
+
+    // A server-to-client streaming RPC. 
+    // 
+    // The client can request the current state of the game at any time.
+    rpc ShowGameState(ShowGameStateRequest) returns (ShowGameStateResponse) {};
+
+    // A client-to-server streaming RPC.
+    // 
+    // The client can send a message to the server to make a move.
+    rpc MakeMove(MakeMoveRequest) returns (MakeMoveResponse) {};
+}   
+
+message ConnectRequest{}
+message ConnectResponse{
+    string message = 1;
+}
+
+message NotifyPlayerTurnRequest{}
+message NotifyPlayerTurnResponse{
+    string message = 1;
+}
+
+message ShowGameStateRequest{}
+message ShowGameStateResponse {
+    repeated int32 board = 1;
+
+    int32 rows = 2;
+    int32 cols = 3;
+
+    string current_player = 4;
+    
+    string winner = 5;
+    bool is_game_over = 6;
+}
+
+
+message MakeMoveRequest{
+    int32 column = 2;
+}
+
+message MakeMoveResponse{
+    string player_id = 2;
+
+    bool is_game_over = 3;
+
+    bool is_valid_move = 4;
+    string error_message = 5;
+}
+
+
+
