@@ -91,15 +91,8 @@ func (s *server) handleClientCommands(stream connect4.Connect4Game_GameSessionSe
 	return nil
 }
 
-func chooseSymbol(numClients int) string {
-	if numClients == 0 {
-		return "x"
-	}
-	return "o"
-}
-
 // handleConnectCommand processes the connect command from the client.
-func (s *server) handleConnectCommand(ipAddr, nickname string, stream connect4.Connect4Game_GameSessionServer) {
+func (s *server) handleConnectCommand(ipAddr string, nickname string, stream connect4.Connect4Game_GameSessionServer) {
 	s.clientsLock.Lock()
 	client := s.clients[ipAddr]
 	client.Nickname = nickname
@@ -149,7 +142,7 @@ func (s *server) handleMoveCommand(ipAddr string, column int32, stream connect4.
 	}
 }
 
-func (s *server) broadcast(activeMessage, otherMessage, board string, closeConnections bool) {
+func (s *server) broadcast(activeMessage string, otherMessage string, board string, closeConnections bool) {
 	s.clientsLock.Lock()
 	defer s.clientsLock.Unlock()
 
@@ -245,7 +238,7 @@ func (s *server) formatBoard() string {
 	var boardStr string
 	for i := 0; i < ROWS; i++ {
 		for j := 0; j < COLS; j++ {
-			cellSymbol := GetCellSymbol(s.gameBoard[i][j])
+			cellSymbol := getCellSymbol(s.gameBoard[i][j])
 			boardStr += fmt.Sprintf("[%s]", cellSymbol)
 		}
 		boardStr += "\n"
@@ -253,7 +246,14 @@ func (s *server) formatBoard() string {
 	return boardStr
 }
 
-func GetCellSymbol(value int32) string {
+func chooseSymbol(numClients int) string {
+	if numClients == 0 {
+		return "x"
+	}
+	return "o"
+}
+
+func getCellSymbol(value int32) string {
 	switch value {
 	case 0:
 		return " "

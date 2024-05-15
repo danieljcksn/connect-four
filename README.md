@@ -10,9 +10,9 @@ O jogo Connect Four permite que dois jogadores se conectem através de uma rede 
 ## Pré-requisitos
 
 Para executar este projeto, você precisará de:
-- Go (versão 1.15 ou superior)
-- gRPC
-- Protocol Buffers
+- [Go (versão 1.15 ou superior) ](https://golang.org/dl/)
+- [gRPC](https://grpc.io/docs/languages/go/quickstart/)
+- [Protocol Buffers v3](https://developers.google.com/protocol-buffers/docs/downloads)
 
 ## Instalação
 
