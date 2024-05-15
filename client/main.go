@@ -10,17 +10,16 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"time"
 
 	connect4 "github.com/danieljcksn/connect-four/proto"
 )
 
 const COLS = 7
 
-func clearScreen() {
-	fmt.Print("\033[H\033[2J")
-}
-
 func main() {
+	scanner := bufio.NewScanner(os.Stdin)
+
 	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure(), grpc.WithBlock())
 
 	if err != nil {
@@ -35,10 +34,16 @@ func main() {
 		log.Fatalf("error creating game session: %v", err)
 	}
 
-	// Send connect command
-	if err := stream.Send(&connect4.GameCommand{Command: "connect", Nickname: "Daniel"}); err != nil {
+	fmt.Print("Enter your nickname: ")
+	scanner.Scan()
+
+	nickname := scanner.Text()
+
+	if err := stream.Send(&connect4.GameCommand{Command: "connect", Nickname: nickname}); err != nil {
 		log.Fatalf("failed to send connection request: %v", err)
 	}
+
+	isMyTurn := false
 
 	go func() {
 		for {
@@ -46,49 +51,44 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to receive a message: %v", err)
 			}
-			if in.Board != "" { // Checks if the board data is included in the update
+			fmt.Println(in.Message)
+			if in.Board != "" { // Check if the board data is included in the update
 				fmt.Println("Current Board:")
-				fmt.Println(in.Board) // Prints the formatted board received from the server
+				fmt.Println(in.Board) // Print the formatted board received from the server
 			}
-			fmt.Println(in.Message) // This prints any text message received from the server
+
+			// Check if it's this client's turn
+			if in.Message == "It's your turn!" {
+				isMyTurn = true
+			} else {
+				isMyTurn = false
+			}
+
+			fmt.Println()
 		}
 	}()
 
-	scanner := bufio.NewScanner(os.Stdin)
-
 	for {
-		fmt.Println("Choose an option: \n1) Show board\n2) Make a move\n3) Check turn")
-		scanner.Scan()
-		input := scanner.Text()
-
-		switch input {
-		case "1":
-			clearScreen()
-
-			if err := stream.Send(&connect4.GameCommand{Command: "show_board"}); err != nil {
-				log.Fatalf("failed to send request for board: %v", err)
-			}
-		case "2":
-			clearScreen()
-
-			fmt.Println("Enter column number:")
-			scanner.Scan()
-			column, err := strconv.Atoi(scanner.Text())
-
-			if err != nil || column < 1 || column > COLS {
-				fmt.Println("Invalid column. Please enter a number between 1 and 7.")
-				continue
-			}
-			if err := stream.Send(&connect4.GameCommand{Command: "move", Column: int32(column - 1)}); err != nil {
-				log.Fatalf("failed to send move: %v", err)
-			}
-		case "3":
-			clearScreen()
-
-			if err := stream.Send(&connect4.GameCommand{Command: "check_turn"}); err != nil {
-				log.Fatalf("failed to send check turn request: %v", err)
-			}
+		for !isMyTurn {
+			// Wait for the turn flag to change
+			<-time.After(time.Millisecond) // Add a small delay to avoid spinning and using 100% CPU
 		}
+
+		fmt.Println("Enter column number (1 to 7):")
+
+		scanner.Scan()
+		column, err := strconv.Atoi(scanner.Text())
+
+		if err != nil || column < 1 || column > COLS {
+			fmt.Println("Invalid column. Please enter a number between 1 and 7.")
+			continue
+		}
+
+		if err := stream.Send(&connect4.GameCommand{Command: "move", Column: int32(column - 1)}); err != nil {
+			log.Fatalf("failed to send move: %v", err)
+		}
+
+		isMyTurn = false // Reset the turn flag after making a move
 	}
 
 }

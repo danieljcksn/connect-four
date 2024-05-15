@@ -11,15 +11,12 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
-const (
-	ROWS = 6
-	COLS = 7
-)
-
 type ClientInfo struct {
 	IP       string
 	Nickname string
 	Symbol   string
+
+	Stream connect4.Connect4Game_GameSessionServer // Store the stream reference, so we can broadcast messages to both clients later
 }
 
 type server struct {
@@ -32,33 +29,46 @@ type server struct {
 	players       [2]string
 }
 
+const (
+	ROWS = 6
+	COLS = 7
+)
+
 func (s *server) GameSession(stream connect4.Connect4Game_GameSessionServer) error {
+	// Get the network information of the client
 	p, ok := peer.FromContext(stream.Context())
+
 	if !ok {
 		return fmt.Errorf("error retrieving peer information")
 	}
 
 	ipAddr := p.Addr.String()
 	s.clientsLock.Lock()
+
 	if len(s.clients) >= 2 {
 		s.clientsLock.Unlock()
-		return fmt.Errorf("cannot connect more than two clients")
+		return fmt.Errorf("maximum number of clients reached")
 	}
 
 	client, exists := s.clients[ipAddr]
+
 	if !exists {
-		client = ClientInfo{IP: ipAddr}
-		if len(s.clients) == 0 {
-			s.currentPlayer = 0 // First player starts
-			client.Symbol = "x"
-		} else {
-			client.Symbol = "o"
+		client = ClientInfo{
+			IP:     ipAddr,
+			Stream: stream,
+			Symbol: chooseSymbol(len(s.clients)),
 		}
-		s.players[len(s.clients)] = ipAddr // Store IP in the array
+		s.players[len(s.clients)] = ipAddr
 		s.clients[ipAddr] = client
 	}
+
 	s.clientsLock.Unlock()
 
+	return s.handleClientCommands(stream, ipAddr)
+}
+
+// handleClientCommands processes commands from the client's stream.
+func (s *server) handleClientCommands(stream connect4.Connect4Game_GameSessionServer, ipAddr string) error {
 	for {
 		in, err := stream.Recv()
 		if err != nil {
@@ -68,81 +78,98 @@ func (s *server) GameSession(stream connect4.Connect4Game_GameSessionServer) err
 
 		switch in.Command {
 		case "connect":
-			nickname := in.Nickname
-
-			s.clientsLock.Lock()
-			client.Nickname = nickname
-			s.clients[ipAddr] = client
-			s.clientsLock.Unlock()
-
-			fmt.Println("%s connected from IP: %s with symbol %s", nickname, ipAddr, client.Symbol)
-			stream.Send(&connect4.GameUpdate{Message: "Welcome to Connect Four, " + nickname + "!", Board: s.formatBoard()})
-
-			if len(s.clients) == 2 {
-				stream.Send(&connect4.GameUpdate{Message: "Game is ready to start", Board: s.formatBoard()})
-			} else {
-				stream.Send(&connect4.GameUpdate{Message: "Waiting for another player to connect"})
-			}
-
+			s.handleConnectCommand(ipAddr, in.Nickname, stream)
 		case "move":
-			if len(s.clients) < 2 {
-				stream.Send(&connect4.GameUpdate{Message: "Waiting for another player to connect"})
-				continue
-			}
-
-			if s.players[s.currentPlayer] != ipAddr {
-				stream.Send(&connect4.GameUpdate{Message: "Not your turn"})
-				continue
-			}
-
-			if s.isValidMove(in.Column) {
-				s.applyMove(in.Column, client.Symbol)
-
-				winner := s.checkForWinner()
-
-				if winner != "" {
-					if winner == "Tie" {
-						stream.Send(&connect4.GameUpdate{Message: "It's a tie!"})
-					} else {
-						stream.Send(&connect4.GameUpdate{Message: fmt.Sprintf("%s wins!", winner)})
-					}
-
-					return nil // End game session after a win
-				}
-
-				s.switchPlayerTurn()
-
-				stream.Send(&connect4.GameUpdate{Message: "Move accepted", Board: s.formatBoard()})
-			} else {
-				stream.Send(&connect4.GameUpdate{Message: "Invalid move"})
-			}
-
-		case "show_board":
-			boardString := s.formatBoard()
-			stream.Send(&connect4.GameUpdate{Message: "Current Board", Board: boardString})
-
-		case "check_turn":
-			if len(s.clients) < 2 {
-				stream.Send(&connect4.GameUpdate{Message: "Waiting for another player to connect"})
-				continue
-			}
-
-			if s.players[s.currentPlayer] == ipAddr {
-				stream.Send(&connect4.GameUpdate{Message: "It's your turn"})
-			} else {
-				stream.Send(&connect4.GameUpdate{Message: "It's the other player's turn"})
-			}
-
+			s.handleMoveCommand(ipAddr, in.Column, stream)
 		}
-
 	}
 
 	s.clientsLock.Lock()
 	delete(s.clients, ipAddr)
 	s.clientsLock.Unlock()
+
 	return nil
 }
 
+func chooseSymbol(numClients int) string {
+	if numClients == 0 {
+		return "x"
+	}
+	return "o"
+}
+
+// handleConnectCommand processes the connect command from the client.
+func (s *server) handleConnectCommand(ipAddr, nickname string, stream connect4.Connect4Game_GameSessionServer) {
+	s.clientsLock.Lock()
+	client := s.clients[ipAddr]
+	client.Nickname = nickname
+	s.clients[ipAddr] = client
+	s.clientsLock.Unlock()
+
+	fmt.Println(nickname, "connected from IP:", ipAddr, ". The player's symbol is:", client.Symbol)
+	stream.Send(&connect4.GameUpdate{Message: "Welcome to Connect Four, " + nickname + "!"})
+
+	if len(s.clients) == 2 {
+		s.broadcast((nickname + " has joined the game!"), "You are now connected.", "", false)
+		s.broadcast("It's your turn!", "Waiting for "+s.clients[s.players[s.currentPlayer]].Nickname+" to make a move.", s.formatBoard(), false)
+	} else {
+		stream.Send(&connect4.GameUpdate{Message: "Just a second! Waiting for another player to connect"})
+	}
+}
+
+// handleMoveCommand processes the move command from the client.
+func (s *server) handleMoveCommand(ipAddr string, column int32, stream connect4.Connect4Game_GameSessionServer) {
+	if len(s.clients) < 2 {
+		stream.Send(&connect4.GameUpdate{Message: "Just a second! Waiting for another player to connect"})
+		return
+	}
+
+	if s.players[s.currentPlayer] != ipAddr {
+		stream.Send(&connect4.GameUpdate{Message: "It's not your turn yet"})
+		return
+	}
+
+	if !s.isValidMove(column) {
+		stream.Send(&connect4.GameUpdate{Message: "Invalid move"})
+		return
+	}
+
+	s.applyMove(column, s.clients[ipAddr].Symbol)
+	winner := s.checkForWinner()
+	switch winner {
+	case "Tie":
+		s.broadcast("The game is a tie.", "The game is a tie.", s.formatBoard(), true)
+		return // End game session after a tie
+	case "":
+		s.switchPlayerTurn()
+		s.broadcast("It's your turn!", "Move accepted. "+s.clients[s.players[s.currentPlayer]].Nickname+"'s turn", s.formatBoard(), false)
+	default:
+		s.broadcast("Congratulations, "+s.clients[s.players[s.currentPlayer]].Nickname+"! You won!", "You lost. Better luck next time.", s.formatBoard(), true)
+		return // End game session after a win
+	}
+}
+
+func (s *server) broadcast(activeMessage, otherMessage, board string, closeConnections bool) {
+	s.clientsLock.Lock()
+	defer s.clientsLock.Unlock()
+
+	for _, client := range s.clients {
+		if client.Stream != nil {
+			message := otherMessage
+			if client.IP == s.players[s.currentPlayer] {
+				message = activeMessage
+			}
+
+			client.Stream.Send(&connect4.GameUpdate{Message: message, Board: board})
+
+			if closeConnections {
+				client.Stream.Context().Done() // Close the stream
+			}
+		}
+	}
+}
+
+// Game logic functions and helpers
 func (s *server) isValidMove(column int32) bool {
 	return column >= 0 && column < COLS && s.gameBoard[0][column] == 0
 }
@@ -213,6 +240,7 @@ func (s *server) switchPlayerTurn() {
 	s.currentPlayer ^= 1 // Toggle between 0 and 1 using XOR
 }
 
+// Formatting functions
 func (s *server) formatBoard() string {
 	var boardStr string
 	for i := 0; i < ROWS; i++ {
@@ -240,6 +268,7 @@ func GetCellSymbol(value int32) string {
 
 func main() {
 	lis, err := net.Listen("tcp", ":50051")
+
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -250,4 +279,6 @@ func main() {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+
+	print("Server started on port 50051")
 }
