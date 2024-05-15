@@ -63,3 +63,20 @@ Siga estas etapas para configurar o ambiente:
 3. Em outro terminal, repita o passo 2 para iniciar o segundo cliente. 
 
 4. Siga as instruções na tela para inserir seu apelido e começar a jogar.
+
+
+### Compilando os arquivos proto (opcional)
+
+Caso deseje compilar os arquivos proto manualmente, siga estas etapas:
+
+1. Navegue até o diretório `proto`:
+   ```
+   cd proto
+   ```
+
+2. Compile os arquivos proto:
+   ```
+   protoc --go_out=. --go_opt=paths=source_relative \
+   --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+   service.proto
+   ```

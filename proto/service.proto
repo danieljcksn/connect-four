@@ -27,7 +27,6 @@ message GameCommand{
 }
 
 message GameUpdate {
-  string status = 1;   // Could include 'wait', 'move_ok', 'not_your_turn', etc.
   string board = 2;    // Current state of the board
   string message = 3;  // Messages related to game status or errors
 }

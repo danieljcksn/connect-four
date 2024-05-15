@@ -58,7 +58,7 @@ func main() {
 			}
 
 			// Check if it's this client's turn
-			if in.Message == "It's your turn!" {
+			if in.Message == "It's your turn!" || in.Message == "Invalid move. Try again." {
 				isMyTurn = true
 			} else {
 				isMyTurn = false

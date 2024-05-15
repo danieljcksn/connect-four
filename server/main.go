@@ -120,17 +120,17 @@ func (s *server) handleConnectCommand(ipAddr, nickname string, stream connect4.C
 // handleMoveCommand processes the move command from the client.
 func (s *server) handleMoveCommand(ipAddr string, column int32, stream connect4.Connect4Game_GameSessionServer) {
 	if len(s.clients) < 2 {
-		stream.Send(&connect4.GameUpdate{Message: "Just a second! Waiting for another player to connect"})
+		stream.Send(&connect4.GameUpdate{Message: "Just a second! Waiting for another player to connect."})
 		return
 	}
 
 	if s.players[s.currentPlayer] != ipAddr {
-		stream.Send(&connect4.GameUpdate{Message: "It's not your turn yet"})
+		stream.Send(&connect4.GameUpdate{Message: "It's not your turn yet."})
 		return
 	}
 
 	if !s.isValidMove(column) {
-		stream.Send(&connect4.GameUpdate{Message: "Invalid move"})
+		stream.Send(&connect4.GameUpdate{Message: "Invalid move. Try again."})
 		return
 	}
 
