@@ -6,10 +6,12 @@ option java_multiple_files = true;
 option java_package = "game";
 option java_outer_classname = "GameProto";
 
-package game;
+package connect4;
 
 // Interface exported by the server.
-service GameService{
+service Connect4Game{
+    rpc GameSession(stream GameCommand) returns (stream GameUpdate);
+
     // A client-to-server streaming RPC. 
     //
     // Once the server has started the stream, the client can 
@@ -35,7 +37,22 @@ service GameService{
     rpc MakeMove(MakeMoveRequest) returns (MakeMoveResponse) {};
 }   
 
-message ConnectRequest{}
+message GameCommand{
+    string command = 1;
+    int32 column = 2;
+    
+    string nickname = 3;
+}
+
+message GameUpdate {
+  string status = 1;   // Could include 'wait', 'move_ok', 'not_your_turn', etc.
+  string board = 2;    // Current state of the board
+  string message = 3;  // Messages related to game status or errors
+}
+
+message ConnectRequest{
+    string nickname = 1;
+}
 message ConnectResponse{
     string message = 1;
 }
@@ -52,7 +69,7 @@ message ShowGameStateResponse {
     int32 rows = 2;
     int32 cols = 3;
 
-    string current_player = 4;
+    bool current_player = 4;
     
     string winner = 5;
     bool is_game_over = 6;

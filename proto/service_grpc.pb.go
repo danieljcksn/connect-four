@@ -19,16 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	GameService_Connect_FullMethodName          = "/game.GameService/Connect"
-	GameService_NotifyPlayerTurn_FullMethodName = "/game.GameService/NotifyPlayerTurn"
-	GameService_ShowGameState_FullMethodName    = "/game.GameService/ShowGameState"
-	GameService_MakeMove_FullMethodName         = "/game.GameService/MakeMove"
+	Connect4Game_GameSession_FullMethodName      = "/connect4.Connect4Game/GameSession"
+	Connect4Game_Connect_FullMethodName          = "/connect4.Connect4Game/Connect"
+	Connect4Game_NotifyPlayerTurn_FullMethodName = "/connect4.Connect4Game/NotifyPlayerTurn"
+	Connect4Game_ShowGameState_FullMethodName    = "/connect4.Connect4Game/ShowGameState"
+	Connect4Game_MakeMove_FullMethodName         = "/connect4.Connect4Game/MakeMove"
 )
 
-// GameServiceClient is the client API for GameService service.
+// Connect4GameClient is the client API for Connect4Game service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type GameServiceClient interface {
+type Connect4GameClient interface {
+	GameSession(ctx context.Context, opts ...grpc.CallOption) (Connect4Game_GameSessionClient, error)
 	// A client-to-server streaming RPC.
 	//
 	// Once the server has started the stream, the client can
@@ -50,54 +52,86 @@ type GameServiceClient interface {
 	MakeMove(ctx context.Context, in *MakeMoveRequest, opts ...grpc.CallOption) (*MakeMoveResponse, error)
 }
 
-type gameServiceClient struct {
+type connect4GameClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewGameServiceClient(cc grpc.ClientConnInterface) GameServiceClient {
-	return &gameServiceClient{cc}
+func NewConnect4GameClient(cc grpc.ClientConnInterface) Connect4GameClient {
+	return &connect4GameClient{cc}
 }
 
-func (c *gameServiceClient) Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error) {
+func (c *connect4GameClient) GameSession(ctx context.Context, opts ...grpc.CallOption) (Connect4Game_GameSessionClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Connect4Game_ServiceDesc.Streams[0], Connect4Game_GameSession_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &connect4GameGameSessionClient{stream}
+	return x, nil
+}
+
+type Connect4Game_GameSessionClient interface {
+	Send(*GameCommand) error
+	Recv() (*GameUpdate, error)
+	grpc.ClientStream
+}
+
+type connect4GameGameSessionClient struct {
+	grpc.ClientStream
+}
+
+func (x *connect4GameGameSessionClient) Send(m *GameCommand) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *connect4GameGameSessionClient) Recv() (*GameUpdate, error) {
+	m := new(GameUpdate)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *connect4GameClient) Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectResponse, error) {
 	out := new(ConnectResponse)
-	err := c.cc.Invoke(ctx, GameService_Connect_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Connect4Game_Connect_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *gameServiceClient) NotifyPlayerTurn(ctx context.Context, in *NotifyPlayerTurnRequest, opts ...grpc.CallOption) (*NotifyPlayerTurnResponse, error) {
+func (c *connect4GameClient) NotifyPlayerTurn(ctx context.Context, in *NotifyPlayerTurnRequest, opts ...grpc.CallOption) (*NotifyPlayerTurnResponse, error) {
 	out := new(NotifyPlayerTurnResponse)
-	err := c.cc.Invoke(ctx, GameService_NotifyPlayerTurn_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Connect4Game_NotifyPlayerTurn_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *gameServiceClient) ShowGameState(ctx context.Context, in *ShowGameStateRequest, opts ...grpc.CallOption) (*ShowGameStateResponse, error) {
+func (c *connect4GameClient) ShowGameState(ctx context.Context, in *ShowGameStateRequest, opts ...grpc.CallOption) (*ShowGameStateResponse, error) {
 	out := new(ShowGameStateResponse)
-	err := c.cc.Invoke(ctx, GameService_ShowGameState_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Connect4Game_ShowGameState_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *gameServiceClient) MakeMove(ctx context.Context, in *MakeMoveRequest, opts ...grpc.CallOption) (*MakeMoveResponse, error) {
+func (c *connect4GameClient) MakeMove(ctx context.Context, in *MakeMoveRequest, opts ...grpc.CallOption) (*MakeMoveResponse, error) {
 	out := new(MakeMoveResponse)
-	err := c.cc.Invoke(ctx, GameService_MakeMove_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Connect4Game_MakeMove_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// GameServiceServer is the server API for GameService service.
-// All implementations must embed UnimplementedGameServiceServer
+// Connect4GameServer is the server API for Connect4Game service.
+// All implementations must embed UnimplementedConnect4GameServer
 // for forward compatibility
-type GameServiceServer interface {
+type Connect4GameServer interface {
+	GameSession(Connect4Game_GameSessionServer) error
 	// A client-to-server streaming RPC.
 	//
 	// Once the server has started the stream, the client can
@@ -117,134 +151,170 @@ type GameServiceServer interface {
 	//
 	// The client can send a message to the server to make a move.
 	MakeMove(context.Context, *MakeMoveRequest) (*MakeMoveResponse, error)
-	mustEmbedUnimplementedGameServiceServer()
+	mustEmbedUnimplementedConnect4GameServer()
 }
 
-// UnimplementedGameServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedGameServiceServer struct {
+// UnimplementedConnect4GameServer must be embedded to have forward compatible implementations.
+type UnimplementedConnect4GameServer struct {
 }
 
-func (UnimplementedGameServiceServer) Connect(context.Context, *ConnectRequest) (*ConnectResponse, error) {
+func (UnimplementedConnect4GameServer) GameSession(Connect4Game_GameSessionServer) error {
+	return status.Errorf(codes.Unimplemented, "method GameSession not implemented")
+}
+func (UnimplementedConnect4GameServer) Connect(context.Context, *ConnectRequest) (*ConnectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Connect not implemented")
 }
-func (UnimplementedGameServiceServer) NotifyPlayerTurn(context.Context, *NotifyPlayerTurnRequest) (*NotifyPlayerTurnResponse, error) {
+func (UnimplementedConnect4GameServer) NotifyPlayerTurn(context.Context, *NotifyPlayerTurnRequest) (*NotifyPlayerTurnResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotifyPlayerTurn not implemented")
 }
-func (UnimplementedGameServiceServer) ShowGameState(context.Context, *ShowGameStateRequest) (*ShowGameStateResponse, error) {
+func (UnimplementedConnect4GameServer) ShowGameState(context.Context, *ShowGameStateRequest) (*ShowGameStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ShowGameState not implemented")
 }
-func (UnimplementedGameServiceServer) MakeMove(context.Context, *MakeMoveRequest) (*MakeMoveResponse, error) {
+func (UnimplementedConnect4GameServer) MakeMove(context.Context, *MakeMoveRequest) (*MakeMoveResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MakeMove not implemented")
 }
-func (UnimplementedGameServiceServer) mustEmbedUnimplementedGameServiceServer() {}
+func (UnimplementedConnect4GameServer) mustEmbedUnimplementedConnect4GameServer() {}
 
-// UnsafeGameServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to GameServiceServer will
+// UnsafeConnect4GameServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to Connect4GameServer will
 // result in compilation errors.
-type UnsafeGameServiceServer interface {
-	mustEmbedUnimplementedGameServiceServer()
+type UnsafeConnect4GameServer interface {
+	mustEmbedUnimplementedConnect4GameServer()
 }
 
-func RegisterGameServiceServer(s grpc.ServiceRegistrar, srv GameServiceServer) {
-	s.RegisterService(&GameService_ServiceDesc, srv)
+func RegisterConnect4GameServer(s grpc.ServiceRegistrar, srv Connect4GameServer) {
+	s.RegisterService(&Connect4Game_ServiceDesc, srv)
 }
 
-func _GameService_Connect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Connect4Game_GameSession_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(Connect4GameServer).GameSession(&connect4GameGameSessionServer{stream})
+}
+
+type Connect4Game_GameSessionServer interface {
+	Send(*GameUpdate) error
+	Recv() (*GameCommand, error)
+	grpc.ServerStream
+}
+
+type connect4GameGameSessionServer struct {
+	grpc.ServerStream
+}
+
+func (x *connect4GameGameSessionServer) Send(m *GameUpdate) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *connect4GameGameSessionServer) Recv() (*GameCommand, error) {
+	m := new(GameCommand)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _Connect4Game_Connect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ConnectRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GameServiceServer).Connect(ctx, in)
+		return srv.(Connect4GameServer).Connect(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GameService_Connect_FullMethodName,
+		FullMethod: Connect4Game_Connect_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GameServiceServer).Connect(ctx, req.(*ConnectRequest))
+		return srv.(Connect4GameServer).Connect(ctx, req.(*ConnectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GameService_NotifyPlayerTurn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Connect4Game_NotifyPlayerTurn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NotifyPlayerTurnRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GameServiceServer).NotifyPlayerTurn(ctx, in)
+		return srv.(Connect4GameServer).NotifyPlayerTurn(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GameService_NotifyPlayerTurn_FullMethodName,
+		FullMethod: Connect4Game_NotifyPlayerTurn_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GameServiceServer).NotifyPlayerTurn(ctx, req.(*NotifyPlayerTurnRequest))
+		return srv.(Connect4GameServer).NotifyPlayerTurn(ctx, req.(*NotifyPlayerTurnRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GameService_ShowGameState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Connect4Game_ShowGameState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ShowGameStateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GameServiceServer).ShowGameState(ctx, in)
+		return srv.(Connect4GameServer).ShowGameState(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GameService_ShowGameState_FullMethodName,
+		FullMethod: Connect4Game_ShowGameState_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GameServiceServer).ShowGameState(ctx, req.(*ShowGameStateRequest))
+		return srv.(Connect4GameServer).ShowGameState(ctx, req.(*ShowGameStateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GameService_MakeMove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Connect4Game_MakeMove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(MakeMoveRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GameServiceServer).MakeMove(ctx, in)
+		return srv.(Connect4GameServer).MakeMove(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GameService_MakeMove_FullMethodName,
+		FullMethod: Connect4Game_MakeMove_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GameServiceServer).MakeMove(ctx, req.(*MakeMoveRequest))
+		return srv.(Connect4GameServer).MakeMove(ctx, req.(*MakeMoveRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// GameService_ServiceDesc is the grpc.ServiceDesc for GameService service.
+// Connect4Game_ServiceDesc is the grpc.ServiceDesc for Connect4Game service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var GameService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "game.GameService",
-	HandlerType: (*GameServiceServer)(nil),
+var Connect4Game_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "connect4.Connect4Game",
+	HandlerType: (*Connect4GameServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Connect",
-			Handler:    _GameService_Connect_Handler,
+			Handler:    _Connect4Game_Connect_Handler,
 		},
 		{
 			MethodName: "NotifyPlayerTurn",
-			Handler:    _GameService_NotifyPlayerTurn_Handler,
+			Handler:    _Connect4Game_NotifyPlayerTurn_Handler,
 		},
 		{
 			MethodName: "ShowGameState",
-			Handler:    _GameService_ShowGameState_Handler,
+			Handler:    _Connect4Game_ShowGameState_Handler,
 		},
 		{
 			MethodName: "MakeMove",
-			Handler:    _GameService_MakeMove_Handler,
+			Handler:    _Connect4Game_MakeMove_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GameSession",
+			Handler:       _Connect4Game_GameSession_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "service.proto",
 }
